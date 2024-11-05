@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Messenger User</title>
+    <style>
+        #messages {
+            border: 1px solid #333;
+            padding: 10px;
+            height: 200px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h3>Messenger</h3>
+    <div id="messages"></div>
+    
+    <label for="nickname">Nickname:</label>
+    <input type="text" id="nickname" placeholder="Enter your nickname" /><br/><br/>
+    
+    <input type="text" id="messageInput" placeholder="Enter your message" />
+    <button onclick="sendMessage()">Send</button>
+    
+    <script>
+        const messagesDiv = document.getElementById('messages');
+        const messageInput = document.getElementById('messageInput');
+        const nicknameInput = document.getElementById('nickname');
+
+        // Function to handle incoming messages
+        function receiveMessage(event) {
+            if (event.origin !== window.origin) return; // Only accept messages from the same origin
+            
+            const data = event.data;
+            const messageElement = document.createElement('p');
+            messageElement.textContent = data;
+            messagesDiv.appendChild(messageElement);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight; // Auto-scroll
+        }
+
+        // Send message to the other iframe
+        function sendMessage() {
+            const nickname = nicknameInput.value.trim();
+            const message = messageInput.value.trim();
+
+            if (!nickname) {
+                alert("Please enter a nickname.");
+                return;
+            }
+            
+            if (message) {
+                const fullMessage = `${nickname}: ${message}`;
+                const targetWindow = window === window.parent.frames['user1'].contentWindow ? 
+                                     window.parent.frames['user2'].contentWindow : 
+                                     window.parent.frames['user1'].contentWindow;
+                targetWindow.postMessage(fullMessage, window.origin);
+                
+                // Display the sent message in the current iframe
+                const sentMessageElement = document.createElement('p');
+                sentMessageElement.textContent = fullMessage;
+                sentMessageElement.style.color = 'blue';
+                messagesDiv.appendChild(sentMessageElement);
+                messagesDiv.scrollTop = messagesDiv.scrollHeight; // Auto-scroll
+                messageInput.value = ''; // Clear input
+            }
+        }
+
+        // Listen for incoming messages
+        window.addEventListener('message', receiveMessage, false);
+    </script>
+</body>
+</html>
