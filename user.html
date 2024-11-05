@@ -2,19 +2,42 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Messenger User</title>
+    <title>Enhanced Messenger User</title>
     <style>
         #messages {
             border: 1px solid #333;
             padding: 10px;
-            height: 200px;
+            height: 250px;
             overflow-y: auto;
             margin-bottom: 10px;
+            background-color: #f9f9f9;
+            font-family: Arial, sans-serif;
+        }
+        .message {
+            margin: 5px 0;
+        }
+        .nickname {
+            font-weight: bold;
+            color: #007bff;
+        }
+        .self-message {
+            color: blue;
+        }
+        .foreign-message .nickname {
+            color: #ff5733;
+        }
+        .code-block {
+            background-color: #272822;
+            color: #66d9ef;
+            padding: 5px;
+            font-family: monospace;
+            white-space: pre;
+            border: 1px solid #000;
         }
     </style>
 </head>
 <body>
-    <h3>Messenger</h3>
+    <h3>Enhanced Messenger</h3>
     <div id="messages"></div>
     
     <label for="nickname">Nickname:</label>
@@ -27,16 +50,34 @@
         const messagesDiv = document.getElementById('messages');
         const messageInput = document.getElementById('messageInput');
         const nicknameInput = document.getElementById('nickname');
+        let messageHistory = [];
+
+        // Utility to format message content with markdown-like syntax
+        function formatMessageContent(message) {
+            return message
+                .replace(/```(.*?)```/gs, '<div class="code-block">$1</div>') // Code block
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Bold
+                .replace(/\*(.*?)\*/g, '<em>$1</em>') // Italic
+                .replace(/~(.*?)~/g, '<small>$1</small>'); // Small font
+        }
 
         // Function to handle incoming messages
         function receiveMessage(event) {
             if (event.origin !== window.origin) return; // Only accept messages from the same origin
             
-            const data = event.data;
+            const data = JSON.parse(event.data);
+            const formattedContent = formatMessageContent(data.content);
             const messageElement = document.createElement('p');
-            messageElement.textContent = data;
+            messageElement.classList.add('message');
+            messageElement.classList.add(data.isSelf ? 'self-message' : 'foreign-message');
+            
+            messageElement.innerHTML = `<span class="nickname" style="color: ${data.color}">${data.nickname}:</span> ${formattedContent}`;
             messagesDiv.appendChild(messageElement);
             messagesDiv.scrollTop = messagesDiv.scrollHeight; // Auto-scroll
+
+            // Store message history and limit to 10 messages
+            messageHistory.push(messageElement.outerHTML);
+            if (messageHistory.length > 10) messageHistory.shift();
         }
 
         // Send message to the other iframe
@@ -51,23 +92,57 @@
             
             if (message) {
                 const fullMessage = `${nickname}: ${message}`;
+                const color = nicknameColor(nickname); // Generate unique color for nickname
+                const data = {
+                    nickname,
+                    content: message,
+                    color,
+                    isSelf: true
+                };
+
+                // Send data to the other iframe as JSON
                 const targetWindow = window === window.parent.frames['user1'].contentWindow ? 
                                      window.parent.frames['user2'].contentWindow : 
                                      window.parent.frames['user1'].contentWindow;
-                targetWindow.postMessage(fullMessage, window.origin);
-                
+                targetWindow.postMessage(JSON.stringify(data), window.origin);
+
                 // Display the sent message in the current iframe
+                const formattedContent = formatMessageContent(data.content);
                 const sentMessageElement = document.createElement('p');
-                sentMessageElement.textContent = fullMessage;
-                sentMessageElement.style.color = 'blue';
+                sentMessageElement.classList.add('message', 'self-message');
+                sentMessageElement.innerHTML = `<span class="nickname" style="color: ${color}">${nickname}:</span> ${formattedContent}`;
                 messagesDiv.appendChild(sentMessageElement);
                 messagesDiv.scrollTop = messagesDiv.scrollHeight; // Auto-scroll
                 messageInput.value = ''; // Clear input
+
+                // Store message history and limit to 10 messages
+                messageHistory.push(sentMessageElement.outerHTML);
+                if (messageHistory.length > 10) messageHistory.shift();
             }
+        }
+
+        // Generate a unique color for each nickname based on a hash
+        function nicknameColor(nickname) {
+            let hash = 0;
+            for (let i = 0; i < nickname.length; i++) {
+                hash = nickname.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            const color = `hsl(${hash % 360}, 70%, 50%)`;
+            return color;
         }
 
         // Listen for incoming messages
         window.addEventListener('message', receiveMessage, false);
+
+        // Display last 10 messages on page load
+        window.addEventListener('load', () => {
+            messageHistory.forEach(message => {
+                const messageElement = document.createElement('div');
+                messageElement.innerHTML = message;
+                messagesDiv.appendChild(messageElement);
+            });
+            messagesDiv.scrollTop = messagesDiv.scrollHeight; // Auto-scroll to bottom
+        });
     </script>
 </body>
 </html>
